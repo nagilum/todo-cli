@@ -8,9 +8,6 @@
         /// <param name="args">Command-line arguments.</param>
         private static void Main(string[] args)
         {
-            // Do we really need to reset colors?
-            Console.ResetColor();
-
             // Parse the command-line arguments into a valid task structure.
             var task = TaskParser.Parse(args);
 

@@ -51,18 +51,11 @@
         /// <summary>
         /// Write the current task to console.
         /// </summary>
-        public void WriteToConsole(int? leftPadding = null)
+        public void WriteToConsole(bool isLevel2 = false)
         {
-            var padding = string.Empty;
-
-            if (leftPadding.HasValue &&
-                leftPadding.Value > 0)
-            {
-                for (var i = 0; i < leftPadding.Value; i++)
-                {
-                    padding += " ";
-                }
-            }
+            var padding = isLevel2
+                ? "  *"
+                : string.Empty;
 
             var list = new List<object>
             {
@@ -73,8 +66,7 @@
                 " "
             };
 
-            if (this.Tags != null &&
-                this.Tags.Any())
+            if (this.Tags?.Count > 0)
             {
                 list.Add(ConsoleColor.Green);
 

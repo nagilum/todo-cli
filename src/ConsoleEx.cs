@@ -26,13 +26,8 @@
                 (byte) 0x00
             };
 
-            while(true)
+            while (ex != null)
             {
-                if (ex == null)
-                {
-                    break;
-                }
-
                 list.Add(ex.Message);
                 list.Add(Environment.NewLine);
 
@@ -55,7 +50,7 @@
         {
             if (ex == null)
             {
-                ex = new ListException("Unknown error!", null);
+                ex = new ListException("Unknown error!");
             }
 
             var list = new List<object>
@@ -66,10 +61,10 @@
                 (byte) 0x00
             };
 
-            if (ex.ConsoleObjects != null &&
-                ex.ConsoleObjects.Any())
+            if (ex.ConsoleObjects?.Length > 0)
             {
                 list.AddRange(ex.ConsoleObjects);
+                list.Add(Environment.NewLine);
             }
             else
             {
@@ -103,6 +98,8 @@
                         Console.Write(obj);
                     }
                 }
+
+                Console.ResetColor();
             }
         }
     }

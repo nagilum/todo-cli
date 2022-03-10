@@ -104,7 +104,7 @@
                         break;
 
                     default:
-                        throw new Exception($"Unable to determine type of command from command-line arguments.");
+                        throw new Exception("Unable to determine type of command from command-line arguments.");
                 }
             }
             catch (ListException lex)
@@ -147,7 +147,7 @@
                 tasks = tasks.Where(n => !n.Completed.HasValue);
             }
 
-            if (this.Tags.Any())
+            if (this.Tags.Count > 0)
             {
                 foreach (var tag in this.Tags)
                 {
@@ -177,7 +177,7 @@
                     subTasks = subTasks.Where(n => !n.Completed.HasValue);
                 }
 
-                if (this.Tags.Any())
+                if (this.Tags.Count > 0)
                 {
                     foreach (var tag in this.Tags)
                     {
@@ -189,7 +189,7 @@
 
                 foreach (var subTask in subTasks)
                 {
-                    subTask.WriteToConsole(5);
+                    subTask.WriteToConsole(true);
                     totalSubTasks++;
                 }
             }
@@ -198,7 +198,7 @@
             {
                 string.Empty,
                 Environment.NewLine,
-                " ",
+                " total ",
                 ConsoleColor.DarkYellow,
                 totalTasks,
                 (byte) 0x00,
@@ -219,9 +219,9 @@
             if (this.SubTaskId != null)
             {
                 var parentTask = Storage.StorageTasks
-                    .FirstOrDefault(n => !n.Deleted.HasValue &&
-                                         !n.Completed.HasValue &&
-                                         n.Id == this.SubTaskId);
+                    .Find(n => !n.Deleted.HasValue &&
+                               !n.Completed.HasValue &&
+                               n.Id == this.SubTaskId);
 
                 if (parentTask == null)
                 {
@@ -229,12 +229,24 @@
                         $"Parent task (id = {this.SubTaskId}) not found!",
                         new object[]
                         {
-                            (byte) 0x00,
                             "Parent task ",
                             ConsoleColor.Blue,
                             this.SubTaskId,
                             (byte) 0x00,
                             " not found!"
+                        });
+                }
+
+                if (parentTask.SubTaskId != null)
+                {
+                    throw new ListException(
+                        $"Parent task (id = {this.SubTaskId}) already has a parent. This version of the app doesn't support more levels than 2, sorry :(",
+                        new object[]
+                        {
+                            "Parent task ",
+                            ConsoleColor.Blue,
+                            this.SubTaskId,
+                            " already has a parent. This version of the app doesn't support more levels than 2, sorry :("
                         });
                 }
             }
@@ -265,25 +277,56 @@
         private void EditTask()
         {
             var task = Storage.StorageTasks
-                .FirstOrDefault(n => !n.Deleted.HasValue &&
-                                     !n.Completed.HasValue &&
-                                     n.Id == this.Id);
+                .Find(n => !n.Deleted.HasValue &&
+                           !n.Completed.HasValue &&
+                           n.Id == this.Id);
 
             if (task == null)
             {
-                throw new Exception($"Task (id = {this.Id}) not found!");
+                throw new ListException(
+                    $"Task (id = {this.Id}) not found!",
+                    new object[]
+                    {
+                        "Task ",
+                        ConsoleColor.Blue,
+                        this.Id ?? string.Empty,
+                        (byte) 0x00,
+                        " not found!"
+                    });
             }
 
             if (this.SubTaskId != null)
             {
                 var parentTask = Storage.StorageTasks
-                    .FirstOrDefault(n => !n.Deleted.HasValue &&
-                                         !n.Completed.HasValue &&
-                                         n.Id == this.SubTaskId);
+                    .Find(n => !n.Deleted.HasValue &&
+                               !n.Completed.HasValue &&
+                               n.Id == this.SubTaskId);
 
                 if (parentTask == null)
                 {
-                    throw new Exception($"Parent task (id = {this.SubTaskId}) not found!");
+                    throw new ListException(
+                        $"Parent task (id = {this.SubTaskId}) not found!",
+                        new object[]
+                        {
+                            "Parent task ",
+                            ConsoleColor.Blue,
+                            this.SubTaskId,
+                            (byte) 0x00,
+                            " not found!"
+                        });
+                }
+
+                if (parentTask.SubTaskId != null)
+                {
+                    throw new ListException(
+                        $"Parent task (id = {this.SubTaskId}) already has a parent. This version of the app doesn't support more levels than 2, sorry :(",
+                        new object[]
+                        {
+                            "Parent task ",
+                            ConsoleColor.Blue,
+                            this.SubTaskId,
+                            " already has a parent. This version of the app doesn't support more levels than 2, sorry :("
+                        });
                 }
             }
 
@@ -305,7 +348,61 @@
         /// </summary>
         private void DeleteTask()
         {
-            throw new NotImplementedException();
+            var task = Storage.StorageTasks
+                .Find(n => !n.Deleted.HasValue &&
+                           n.Id == this.Id);
+
+            if (task == null)
+            {
+                throw new ListException(
+                    $"Task (id = {this.Id}) not found!",
+                    new object[]
+                    {
+                        "Task ",
+                        ConsoleColor.Blue,
+                        this.Id ?? string.Empty,
+                        (byte) 0x00,
+                        " not found!"
+                    });
+            }
+
+            var subTasks = Storage.StorageTasks
+                .FindAll(n => !n.Deleted.HasValue &&
+                              n.SubTaskId == this.Id);
+
+            if (subTasks.Count > 0 &&
+                (!this.Recursive.HasValue ||
+                 !this.Recursive.Value))
+            {
+                throw new ListException(
+                    $"Task (id = {this.Id}) has sub tasks. Apply the -r option to also delete subtasks.",
+                    new object[]
+                    {
+                        "Task ",
+                        ConsoleColor.Blue,
+                        this.Id ?? string.Empty,
+                        (byte) 0x00,
+                        " has sub tasks. Apply the -r option to also delete subtasks."
+                    });
+            }
+
+            foreach (var subTask in subTasks)
+            {
+                subTask.Deleted = DateTimeOffset.Now;
+            }
+
+            task.Deleted = DateTimeOffset.Now;
+
+            if (!Storage.Save(out var exception))
+            {
+                ConsoleEx.WriteException(exception);
+            }
+
+            ConsoleEx.Write(new object[]
+            {
+                "Ok",
+                Environment.NewLine
+            });
         }
 
         /// <summary>
@@ -320,7 +417,75 @@
                 return;
             }
 
-            throw new NotImplementedException();
+            var task = Storage.StorageTasks
+                .Find(n => !n.Deleted.HasValue &&
+                           n.Id == this.Id);
+
+            if (task == null)
+            {
+                throw new ListException(
+                    $"Task (id = {this.Id}) not found!",
+                    new object[]
+                    {
+                        "Task ",
+                        ConsoleColor.Blue,
+                        this.Id ?? string.Empty,
+                        (byte) 0x00,
+                        " not found!"
+                    });
+            }
+
+            var subTasks = Storage.StorageTasks
+                .FindAll(n => !n.Deleted.HasValue &&
+                              n.SubTaskId == this.Id);
+
+            if (subTasks.Count > 0 &&
+                (!this.Recursive.HasValue ||
+                 !this.Recursive.Value))
+            {
+                throw new ListException(
+                    $"Task (id = {this.Id}) has sub tasks. Apply the -r option to also toggle completed on subtasks.",
+                    new object[]
+                    {
+                        "Task ",
+                        ConsoleColor.Blue,
+                        this.Id ?? string.Empty,
+                        (byte) 0x00,
+                        " has sub tasks. Apply the -r option to also toggle completed on subtasks."
+                    });
+            }
+
+            foreach (var subTask in subTasks)
+            {
+                if (subTask.Completed.HasValue)
+                {
+                    subTask.Completed = null;
+                }
+                else
+                {
+                    subTask.Completed = DateTimeOffset.Now;
+                }
+            }
+
+            if (task.Completed.HasValue)
+            {
+                task.Completed = null;
+            }
+            else
+            {
+                task.Completed = DateTimeOffset.Now;
+            }
+
+            if (!Storage.Save(out var exception))
+            {
+                ConsoleEx.WriteException(exception);
+            }
+
+            ConsoleEx.Write(new object[]
+            {
+                "Ok",
+                Environment.NewLine
+            });
         }
 
         /// <summary>
@@ -339,41 +504,52 @@
             {
                 "TODO CLI v0.1", Environment.NewLine,
                 Environment.NewLine,
+
                 sfp,
+
                 "Usage: [command] [<option>] [text]", Environment.NewLine,
                 Environment.NewLine,
+
                 "Commands:", Environment.NewLine,
                 "  -n        New task.", Environment.NewLine,
                 "  -e <id>   Edit task.", Environment.NewLine,
                 "  -d <id>   Delete task.", Environment.NewLine,
-                "  -c <id>   Mark a task as completed/not completed.", Environment.NewLine,
+                "  -c <id>   Toggle completed/not completed.", Environment.NewLine,
                 "  -h        Shows this information.", Environment.NewLine,
                 Environment.NewLine,
+
                 "Options:", Environment.NewLine,
                 "  -s <id>   Attach a task to another task.", Environment.NewLine,
                 "  -t <tag>  Attach a tag to a task, or search by tag.", Environment.NewLine,
                 "  -r        Enable recursive when deleting.", Environment.NewLine,
                 Environment.NewLine,
+
                 "Examples:", Environment.NewLine,
                 "  List all open tasks:", Environment.NewLine,
                 "  todo", Environment.NewLine,
                 Environment.NewLine,
+
                 "  List all open tasks with given tag(s):", Environment.NewLine,
                 "  todo -t tag1", Environment.NewLine,
                 Environment.NewLine,
+
                 "  List all tasks that have been marked as completed:", Environment.NewLine,
                 "  todo -c", Environment.NewLine,
                 Environment.NewLine,
+
                 "  Create a new task as a sub task of the task <abc> with the tag <def> and <ghi>:", Environment.NewLine,
                 "  todo -n -s abc -t def -t ghi This is a test", Environment.NewLine,
                 Environment.NewLine,
+
                 "  Edit (replace) a tasks info of task <abc>:", Environment.NewLine,
                 "  todo -e abc -t def This is an edit!", Environment.NewLine,
                 Environment.NewLine,
+
                 "  Delete a task:", Environment.NewLine,
                 "  todo -d abc", Environment.NewLine,
                 Environment.NewLine,
-                "  Mark a todo as completed/not completed:", Environment.NewLine,
+
+                "  Toggle completed/not completed:", Environment.NewLine,
                 "  todo -c abc", Environment.NewLine,
                 Environment.NewLine
             };

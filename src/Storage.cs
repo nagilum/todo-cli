@@ -31,13 +31,8 @@ namespace TodoCli
                 .Replace("-", string.Empty)
                 .Substring(0, length);
 
-            while (true)
+            while (StorageTasks.Any(n => n.Id == id))
             {
-                if (!StorageTasks.Any(n => n.Id == id))
-                {
-                    break;
-                }
-
                 attempts++;
 
                 if (attempts == maxAttempts)
@@ -104,7 +99,14 @@ namespace TodoCli
 
                 if (tasks == null)
                 {
-                    throw new Exception($"Loaded tasks from disk, but was unable to parse them. Original file: {StorageFullPath}");
+                    throw new ListException(
+                        $"Loaded tasks from disk, but was unable to parse them. Original file: {StorageFullPath}",
+                        new object[]
+                        {
+                            "Loaded tasks from disk, but was unable to parse them. Original file: ",
+                            ConsoleColor.Yellow,
+                            StorageFullPath
+                        });
                 }
 
                 StorageTasks = tasks;
